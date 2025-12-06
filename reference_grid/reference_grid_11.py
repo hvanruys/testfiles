@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def fci_latlon_to_grid(lat, lon, ssd=1.0):
     """
     Convert latitude/longitude to FCI Level 1c reference grid row/column.
@@ -22,7 +23,7 @@ def fci_latlon_to_grid(lat, lon, ssd=1.0):
     Notes:
     ------
     Based on MTG FCI L1 Product User Guide sections 5.2 and 5.3
-    This implements the forward geostationary projection.
+    This is the forward projection from geographic to satellite viewing angles.
     """
     
     # Grid parameters for different SSDs
@@ -64,45 +65,56 @@ def fci_latlon_to_grid(lat, lon, ssd=1.0):
     lat_rad = np.asarray(lat) * np.pi / 180
     lon_rad = np.asarray(lon) * np.pi / 180
     
-    # Forward geostationary projection
-    # This is the inverse of the equations in Section 5.3
-    
-    # Calculate intermediate values
+    # Forward projection: geographic coordinates to viewing angles
+    # Step 1: Convert geodetic latitude to geocentric coordinates
     cos_lat = np.cos(lat_rad)
     sin_lat = np.sin(lat_rad)
-    cos_lon = np.cos(lon_rad - lambda_D)
-    sin_lon = np.sin(lon_rad - lambda_D)
+    cos_lon = np.cos(lon_rad)
+    sin_lon = np.sin(lon_rad)
     
-    # Calculate r_pol/r_eq squared
-    r_ratio_sq = (r_pol / r_eq) ** 2
+    # Geocentric latitude
+    c = 1.0 / np.sqrt(cos_lat**2 + (r_pol/r_eq)**2 * sin_lat**2)
     
-    # Calculate cosine of geocentric latitude
-    cos_beta = cos_lat / np.sqrt(1.0 - (1.0 - r_ratio_sq) * sin_lat**2)
+    # Position on Earth's surface in geocentric coordinates
+    x = r_eq * c * cos_lat * cos_lon
+    y = r_eq * c * cos_lat * sin_lon
+    z = r_pol * c * (r_pol/r_eq) * sin_lat
     
-    # Calculate s_d (visibility check)
-    s_d = (h * cos_lon * cos_beta)**2 - (cos_beta**2 + r_ratio_sq * sin_lat**2) * (h**2 - r_eq**2)
-    s_d_2 = (h * cos_lambda_s * cos_phi_s)**2 - s5 * (cos_phi_s**2 + s4 * sin_phi_s**2)
-    s_d = np.sqrt(s_d_2)
-
-    # Check visibility
-    visible = s_d >= 0
+    # Step 2: Calculate satellite position
+    x_sat = h
+    y_sat = 0.0
+    z_sat = 0.0
     
-    # Calculate s_n
-    s_n = (h * cos_lon * cos_beta - np.sqrt(s_d)) / (cos_beta**2 + r_ratio_sq * sin_lat**2)
+    # Step 3: Vector from satellite to point on Earth
+    dx = x - x_sat
+    dy = y
+    dz = z
     
-    # Calculate s_1, s_2, s_3
-    s_1 = h - s_n * cos_beta * cos_lon
-    s_2 = s_n * cos_beta * sin_lon
-    s_3 = s_n * sin_lat
+    # Step 4: Check visibility
+    # Point must be on the Earth-facing hemisphere
+    distance = np.sqrt(dx**2 + dy**2 + dz**2)
     
-    # Calculate s_xy
-    s_xy = np.sqrt(s_1**2 + s_2**2)
+    # For a point to be visible, the angle between the satellite-to-point vector
+    # and the satellite-to-Earth-center vector must be less than the horizon angle
+    cos_angle = -dx / distance  # dot product with normalized vectors
+    horizon_angle = np.arcsin(r_eq / h)
+    visible = cos_angle > np.cos(np.pi/2 + horizon_angle)
     
-    # Calculate viewing angles
-    lambda_s = np.arctan(s_2 / s_1)
-    phi_s = np.arctan(s_3 / (s_xy * (r_pol / r_eq)**2))
+    # Step 5: Calculate viewing angles
+    # phi_s: elevation angle (North-South)
+    # lambda_s: azimuth angle (East-West, but note the sign convention!)
+    
+    # Distance in the equatorial plane
+    rho_c = np.sqrt(dx**2 + dy**2)
+    
+    # Elevation angle
+    phi_s = np.arctan(dz / rho_c)
+    
+    # Azimuth angle (note: increases from East to West in the viewing convention)
+    lambda_s = np.arctan(dy / dx)
     
     # Convert viewing angles to row and column
+    # Note: equations from Section 5.2, solved for row and column
     column = (params['lambda_0'] - lambda_s) / params['azimuth_sampling'] + 1
     row = (phi_s - params['phi_0']) / params['elevation_sampling'] + 1
     
@@ -268,6 +280,7 @@ if __name__ == "__main__":
     print(f"Lon range (Earth only): {np.nanmin(lon_grid):.4f}° to {np.nanmax(lon_grid):.4f}°")
     print(f"Lat range (Earth only): {np.nanmin(lat_grid):.4f}° to {np.nanmax(lat_grid):.4f}°")
 
+
     # Your database of locations
     lats = np.array([50.85, 51.51, 48.86])  # Brussels, London, Paris
     lons = np.array([4.35, -0.13, 2.35])
@@ -292,4 +305,3 @@ if __name__ == "__main__":
     lon_bxl, lat_bxl, is_earth_bxl = fci_grid_to_latlon(np.round(p_row).astype(int), np.round(p_col).astype(int), ssd=1.0)
     status_bxl = "Earth" if is_earth_bxl else "Space"
     print(f"Back conversion -> Lon: {lon_bxl:.4f}°, Lat: {lat_bxl:.4f}° -> {status_bxl}")
-    

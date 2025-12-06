@@ -123,7 +123,6 @@ def fci_latlon_to_grid(lat, lon, ssd=1.0):
     
     return row, column
 
-
 def fci_grid_to_latlon(row, column, ssd=1.0):
     """
     Convert FCI Level 1c reference grid row/column to latitude/longitude.
@@ -195,24 +194,24 @@ def fci_grid_to_latlon(row, column, ssd=1.0):
     sin_lambda_s = np.sin(lambda_s)
     cos_phi_s = np.cos(phi_s)
     sin_phi_s = np.sin(phi_s)
-    
+    s5 = h**2 - r_eq**2
+    s4 = (r_eq / r_pol)**2
+
+    s_d_2 = (h * cos_lambda_s * cos_phi_s)**2 - s5 * (cos_phi_s**2 + s4 * sin_phi_s**2)
+    s_d = np.sqrt(s_d_2)
+
     # Calculate s_n
-    s_n = h - np.sqrt((r_eq**2) * (cos_lambda_s**2) * (cos_phi_s**2) + 
-                      (r_pol**2) * (sin_phi_s**2))
-    
+    s_n = (h * cos_lambda_s * cos_phi_s - s_d ) / (cos_phi_s**2 + s4 * sin_phi_s**2)
     # Calculate s1, s2, s3
     s1 = h - s_n * cos_lambda_s * cos_phi_s
-    s2 = s_n * sin_lambda_s * cos_phi_s
+    s2 = - s_n * sin_lambda_s * cos_phi_s
     s3 = s_n * sin_phi_s
     
     # Calculate s_xy and s4
     s_xy = np.sqrt(s1**2 + s2**2)
-    s4 = (r_pol / r_eq)**2
     
     # Check if the line of sight intersects Earth
     # The discriminant s_d must be non-negative for Earth intersection
-    s_d = (h * cos_lambda_s * cos_phi_s)**2 - (h**2 - r_eq**2) * (cos_phi_s**2) - (h**2 - r_pol**2) * (sin_phi_s**2)
-    
     # Create mask for valid Earth pixels
     earth_mask = s_d >= 0
     
@@ -223,7 +222,7 @@ def fci_grid_to_latlon(row, column, ssd=1.0):
     # Only calculate lat/lon for pixels that see Earth
     if np.any(earth_mask):
         # Calculate latitude and longitude for Earth pixels
-        lat = np.arctan(s3 / (s_xy * s4))
+        lat = np.arctan((s3 / s_xy) * s4)
         lon = np.arctan(s2 / s1) + lambda_D * np.pi / 180
         
         # Convert to degrees
