@@ -208,7 +208,7 @@ plt.savefig('fci_composite_histogram.png', dpi=100)
 plt.show()
 '''
 
-'''
+
 rgb_array = np.stack([composite_uint8_R, composite_uint8_G, composite_uint8_B, alpha_channel], axis=-1)
 # Save as PNG
 img = Image.fromarray(rgb_array, mode='RGBA')
@@ -218,7 +218,7 @@ imgout.save(output_file)
 print(f"Composite image saved to: {output_file}")
 print(f"Image shape: {composite_uint8_R.shape}")
 print(f"Value range: {composite_uint8_R.min()} - {composite_uint8_R.max()}")
-'''
+
 #print(f"Region total_subsolar_lon [5000:5050, 5000:5050]:\n{total_subsolar_lon[5000:5010, 5000:5010]}")
 #print(f"Region total_subsolar_lat [5000:5050, 5000:5050]:\n{total_subsolar_lat[5000:5010, 5000:5010]}")
 
