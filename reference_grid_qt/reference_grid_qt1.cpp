@@ -94,6 +94,7 @@ struct GridToLatLonResult
 };
 
 long count_invisible;
+long count_visible;
 
 
 // Convert latitude/longitude to FCI grid row/column
@@ -133,9 +134,14 @@ LatLonToGridResult fci_latlon_to_grid(const QVector<double> &lats,
         double distance = std::sqrt(dx * dx + dy * dy + dz * dz);
         double cos_angle = -dx / distance;
         double horizon_angle = std::asin(r_eq / h);
-        bool visible = cos_angle < std::cos(horizon_angle);
+        //bool visible = cos_angle < std::cos(horizon_angle);
+        double g = cos_lat * cos_lon;
+        bool visible = g >= (1.0/distance);
         if(!visible)
-            count_invisible += 1;   
+            count_invisible += 1;
+        else {
+            count_visible += 1;
+        }
 
         double rho_c = std::sqrt(dx * dx + dy * dy);
         double phi_s = std::atan(dz / rho_c);
@@ -498,7 +504,7 @@ private slots:
         const int SIZE = 11136;
         const double SSD = 1.0;
         count_invisible = 0;
-
+        count_visible = 0;
         QImage image(SIZE, SIZE, QImage::Format_RGB32);
         image.fill(Qt::white);
 
@@ -570,6 +576,7 @@ private slots:
         painter.end();
 
         qDebug() << "Total invisible points:" << count_invisible;
+        qDebug() << "Total visible points:" << count_visible;
         image.flip(Qt::Vertical);
         // Display and save image
         mapLabel->setPixmap(QPixmap::fromImage(image).scaledToWidth(512, Qt::SmoothTransformation));
@@ -678,4 +685,4 @@ int main(int argc, char *argv[])
     return app.exec();
 }
 
-#include "reference_grid_qt.moc"
+#include "reference_grid_qt1.moc"
